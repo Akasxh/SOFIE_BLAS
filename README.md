@@ -1,58 +1,121 @@
-# SOFIE_BLAS (Standalone BLAS for SOFIE.)
+# SOFIE BLAS
 
-This repository contains GPU-accelerated implementations of fundamental mathematical and neural network operations using [ALPAKA](https://github.com/alpaka-group/alpaka).
+Standalone BLAS implementation for [ROOT SOFIE](https://root.cern/doc/master/group__SOFIE.html) (System for Optimized Fast Inference) using [Alpaka](https://github.com/alpaka-group/alpaka) for portable GPU acceleration. Provides activation functions, element-wise operations, normalization layers, and GEMM for neural network inference on heterogeneous hardware.
 
-The work is organized into **phases**, with operators grouped by type for development.
+```mermaid
+flowchart TB
+    subgraph "SOFIE Inference Pipeline"
+        ONNX["ONNX Model"] --> CODEGEN["SOFIE Code Generator"]
+        CODEGEN --> SESSION["Generated Session Code"]
+    end
 
-### Activations (GPU Kernels)
+    subgraph "SOFIE BLAS Backend (This Repo)"
+        direction TB
+        ACT["Activation Functions\nReLU, Sigmoid, Tanh\nGELU, ELU, Leaky ReLU"]
+        BIN["Binary Ops\nAdd, Sub, Mul, Div\nMax, Min, Power, Dot"]
+        UNI["Unary Ops\nNegate, Abs, Sqrt\nExp, Log, Clip, Sign"]
+        NORM["Normalization\nBatchNorm, LayerNorm"]
+        GEMM["GEMM\n(Matrix Multiply)"]
+        SOFT["Softmax"]
+        TRANS["Transpose\n(2D / Batched)"]
+    end
 
-* [x] ReLU
-* [x] Leaky ReLU
-* [ ] PReLU
-* [x] Tanh
-* [x] ELU
-* [x] GELU
-* [ ] Swish
-* [x] Sigmoid
-* [ ] SELU
+    subgraph "Alpaka Backends"
+        CUDA["CUDA"]
+        HIP["HIP"]
+        OMP["OpenMP"]
+        CPU["CPU Threads"]
+    end
 
-### Binary Operations (element-wise unless noted)
+    SESSION --> ACT & BIN & UNI & NORM & GEMM
+    ACT & BIN & UNI & NORM & GEMM --> CUDA & HIP & OMP & CPU
 
-* [ ] Add (`A + B`)
-* [ ] Subtract (`A - B`)
-* [ ] Multiply (`A * B`)
-* [ ] Divide (`A / B`)
-* [ ] Max (`max(A, B)`)
-* [ ] Min (`min(A, B)`)
-* [ ] Power (`A ** B`)
-* [ ] Dot Product (vector inner product)
+    style ACT fill:#2d5016,color:#fff
+    style GEMM fill:#8b6914,color:#fff
+```
 
-### Unary Operations (element-wise)
+## Implementation Status
 
-* [ ] Negate (`-A`)
-* [ ] Absolute (`|A|`)
-* [ ] Square (`A^2`)
-* [ ] Sqrt (`sqrt(A)`)
-* [ ] Exp (`exp(A)`)
-* [ ] Log (`log(A)`)
-* [ ] Clip (min/max)
-* [ ] Sign (−1/0/1)
+### Activation Functions (GPU Kernels)
+- [x] ReLU
+- [x] Leaky ReLU
+- [ ] PReLU
+- [x] Tanh
+- [x] ELU
+- [x] GELU (tanh approximation)
+- [ ] Swish
+- [x] Sigmoid
+- [ ] SELU
+
+### Binary Operations (Element-wise)
+- [ ] Add, Subtract, Multiply, Divide
+- [ ] Max, Min, Power
+- [ ] Dot Product
+
+### Unary Operations (Element-wise)
+- [ ] Negate, Absolute, Square, Sqrt
+- [ ] Exp, Log, Clip, Sign
 
 ### Normalization Layers
+- [ ] Batch Normalization
+- [ ] Layer Normalization
 
-* [ ] Batch Normalization (train + inference)
-* [ ] Layer Normalization
+### BLAS / Matrix Operations
+- [ ] GEMM
+- [ ] Softmax
+- [ ] Transpose (2D / Batched)
 
-### Functions with BLAS Abstraction
+## Quick Start
 
-* [ ] GEMM (matrix–matrix multiply)
-* [ ] Softmax (axis-wise, stable implementation)
+### Prerequisites
 
-### Matrix Operations
+- [Alpaka](https://github.com/alpaka-group/alpaka) installed
+- C++17 compiler
+- CUDA Toolkit (for GPU backend)
 
-* [ ] Transpose (2D)
-* [ ] Batched Transpose (3D/ND)
+### Usage
 
+The activation functions are implemented as Alpaka kernel functors. Include and use them directly:
 
+```cpp
+#include "Activation_Functions.cpp"
 
+// Create the kernel instance
+sofie_blas::Activation_Functions kernel;
 
+// Launch with any activation op
+alpaka::exec<Acc>(queue, workDiv, kernel,
+    input_ptr, output_ptr, num_elements,
+    sofie_blas::OpRelu<float>{});
+
+// Or with parameterized ops
+alpaka::exec<Acc>(queue, workDiv, kernel,
+    input_ptr, output_ptr, num_elements,
+    sofie_blas::OpLeakyRelu<float>{0.01f});
+```
+
+## Project Structure
+
+```
+SOFIE_BLAS/
+├── Activation_Functions.cpp   # GPU kernels: ReLU, Sigmoid, Tanh, GELU, ELU, Leaky ReLU
+└── README.md
+```
+
+## Tech Stack
+
+- **C++17**
+- **Alpaka** — Portable parallel kernel abstraction
+- **ROOT SOFIE** — ONNX inference code generation
+- **CUDA / HIP / OpenMP** — Backend support
+
+## Contributing
+
+1. Fork the repository
+2. Implement missing operators from the checklist above
+3. Follow the existing functor pattern (`OpName<T>` with `ALPAKA_FN_ACC operator()`)
+4. Submit a pull request
+
+## License
+
+This project is available under the MIT License.
